@@ -3,6 +3,7 @@ import os
 import time
 import random
 
+import gradio
 import gradio as gr
 import numpy as np
 import openai
@@ -121,7 +122,8 @@ class XAILaw:
         return result
 
 
-dummy_output = '정관의 규정이 법령에 부합하는 것으로 보입니다. 정관 제30조에는 "이사는 주주총회에서 선임한다"는 내용이 명시되어 있으며, 이는 법령인 제382조의 규정과 일치합니다. 따라서, 이사의 선임 방식에 관련하여 정관은 법령에 부합하고 적법한 규정을 가지고 있다고 판단됩니다.'
+dummy_output = '이사는 주주총회에서 선임됩니다. (정관 문서, 제30조)'
+dummy_output2 = '정관의 규정이 법령에 부합하는 것으로 보입니다. 정관 제30조에는 "이사는 주주총회에서 선임한다"는 내용이 명시되어 있으며, 이는 법령인 제382조의 규정과 일치합니다. 따라서, 이사의 선임 방식에 관련하여 정관은 법령에 부합하고 적법한 규정을 가지고 있다고 판단됩니다.'
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="example")
@@ -181,7 +183,30 @@ def main(cfg: DictConfig) -> None:
             time.sleep(random.randint(1, 3))
             return gr.Label.update('분석 결과를 출력합니다.' + dummy_output)
 
-        gr.Markdown("""# XAILaw Demo""")
+        def upload_input_file(file):
+            if file is None:
+                return
+
+            print('input_file :', file)
+
+            file_path = file.name
+
+            # read text from file
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+
+            print('text :', text)
+
+            time.sleep(random.randint(1, 3))
+            return text
+
+        gr.Markdown("""# 생성형 AI 기반 정관 검토 서비스""")
+        gr.Markdown("""## 파일 업로드""")
+
+        input_file = gradio.File()
+
+        input_file.upload(fn=upload_input_file)
+        file_btn = gr.Button("업로드")
 
         with gr.Tab('정관 샘플 1'):
             text1 = gr.Text(prompt, label='정관 문단 입력', max_lines=10)
@@ -192,12 +217,16 @@ def main(cfg: DictConfig) -> None:
             # text2.value = 'test'
             btn2 = gr.Button("분석")
 
-        question_label = gr.Radio(label='예상 질문 분석', info='정관 문단에서 예상되는 질문을 분석하여 출력합니다.', choices=[], interactive=True)
+        gr.Markdown("""## 위 정관 내용에서 분석되어야 할 항목입니다.""")
+
+        question_label = gr.Radio(label='변호사 체크 리스트', info='정관 문단에서 예상되는 질문을 분석하여 출력합니다.', choices=[], interactive=True)
         output_label = gr.Label(label='분석결과')
         question_label.input(fn=click_radio, inputs=question_label, outputs=output_label, queue=False)
 
         btn1.click(fn=click_button, inputs=text1, outputs=question_label, queue=False)
         btn2.click(fn=click_button, inputs=text2, outputs=question_label, queue=False)
+
+        file_btn.click(fn=upload_input_file, inputs=input_file, outputs=text1, queue=False)
 
         msg = gr.Textbox(label="입력")  # '입력'이라는 레이블을 가진 텍스트박스를 생성합니다.
         clear = gr.Button("초기화")  # '초기화'라는 레이블을 가진 버튼을 생성합니다.
