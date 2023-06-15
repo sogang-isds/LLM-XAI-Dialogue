@@ -183,9 +183,13 @@ def main(cfg: DictConfig) -> None:
             return gr.Label.update(text)
 
         def click_radio(value):
-            print(value)
+            print('click_radio:', value)
             time.sleep(random.randint(1, 3))
             return gr.Label.update('분석 결과를 출력합니다.' + dummy_output)
+
+        def select_radio():
+            print('select_radio')
+            return gr.Label.update(value=None)
 
         def upload_input_file(file):
             if file is None:
@@ -207,32 +211,33 @@ def main(cfg: DictConfig) -> None:
         gr.Markdown("""# 생성형 AI 기반 정관 검토 서비스""")
         gr.Markdown("""## 파일 업로드""")
 
-        input_file = gradio.File()
+        input_file = gradio.File(label='정관 파일 업로드', type='file')
 
-        input_file.upload(fn=upload_input_file)
-        file_btn = gr.Button("업로드")
-
+        gr.Markdown("""## 정관 검토""")
         text1 = gr.Text(prompt, label='정관 내용', max_lines=10)
-        btn1 = gr.Button("분석")
+        btn1 = gr.Button("정관 체크리스트 분석")
 
-        gr.Markdown("""## 위 정관 내용에서 분석되어야 할 항목입니다.""")
+        gr.Markdown("""## 체크리스트 분석""")
+        gr.Markdown("""위 정관 내용에서 분석되어야 할 항목을 출력합니다.""")
 
-        question_label = gr.Radio(label='변호사 체크 리스트', info='정관 문단에서 예상되는 질문을 분석하여 출력합니다.', choices=[], interactive=True)
+        question_radio = gr.Radio(label='변호사 체크리스트', info='아래 버튼 중 하나를 선택해 주세요.', choices=[], interactive=True)
+
         output_label = gr.Label(label='분석된 답변')
-        question_label.input(fn=click_radio, inputs=question_label, outputs=output_label, queue=False)
         btn2 = gr.Button("Analytic Statement 분석")
+
         output_label2 = gr.Label(label='Analytic Statement 분석 결과')
+
+        question_radio.input(fn=click_radio, inputs=[question_radio], outputs=[output_label], queue=False)
+        question_radio.select(fn=select_radio, outputs=output_label2, queue=False)
+
         btn2.click(fn=click_button2, inputs=output_label, outputs=output_label2, queue=False)
 
-        btn1.click(fn=click_button, inputs=text1, outputs=question_label, queue=False)
+        input_file.upload(fn=upload_input_file, inputs=input_file, outputs=text1)
 
-        file_btn.click(fn=upload_input_file, inputs=input_file, outputs=text1, queue=False)
+        btn1.click(fn=click_button, inputs=text1, outputs=question_radio, queue=False)
 
         msg = gr.Textbox(label="입력")  # '입력'이라는 레이블을 가진 텍스트박스를 생성합니다.
         clear = gr.Button("초기화")  # '초기화'라는 레이블을 가진 버튼을 생성합니다.
-
-        button = gr.Button("테스트")
-        button.click(fn=click_button, inputs=msg, outputs=None, queue=False)
 
         # msg.submit(request_chatgpt, [msg, chatbot], [msg, chatbot])  # 텍스트박스에 메시지를 입력하고 제출하면 respond 함수가 호출되도록 합니다.
         # clear.click(lambda: None, None, chatbot, queue=False)  # '초기화' 버튼을 클릭하면 채팅 기록을 초기화합니다.
