@@ -122,8 +122,84 @@ class XAILaw:
         return result
 
 
+class XAILawPrompt:
+    def __init__(self, article=None, commercial_law=None):
+        if article:
+            self.article = article
+        if commercial_law:
+            self.commercial_law = commercial_law
+
+    def set_article(self, article):
+        self.article = article
+
+    def set_commecial_law(self, commercial_law):
+        self.commercial_law = commercial_law
+
+    def generate_question_prompt(self, question):
+        question_prompt = f"""다음 정관 문서를 읽고 질문에 답하세요. 답변은 정관에 기반해서 간결하게 작성해 주세요. 정관에 없는 내용일 경우 없다고 알려주세요.
+{self.article}
+
+질문: {question}
+답변: 내용(조항)
+"""
+        return question_prompt
+
+    def generate_analytic_prompt(self, question, result):
+        question_idx = related_questions.index(question)
+        commercial_law = related_commercial_law[question_idx]
+
+        prompt = f"""정관의 내용은 아래와 같습니다.
+{self.article}
+
+아래는 정관에 대한 질문과 답변입니다.
+
+질문: {question}
+답변: {result}
+
+이 질문과 관련된 법령은 아래와 같습니다.
+상법: {commercial_law}
+
+변호사라고 생각하고 상법에 기반하여 정관의 규정이 적법한지 조언을 상세하게 작성해 주세요.
+
+변호사 조언:
+"""
+
+        return prompt
+
+
+dummy_prompt = f"""다음 정관 문서를 읽고 질문에 답하세요.
+
+정관 문서: 제 5 장 이사·이사회 제29조(이사의 수) ① 본 회사의 이사는 3인 이상 9인 이하로 한다. ② 이사는 사내이사, 사외이사와 그 밖에 상시적인 업무에 종사하지 아니하는 이사로 구분하고, 사외이사는 3인 이상으로 하되, 이사 총수의 과반수로 한다. <개정 1997.5.31, 1998.5.30, 2000.5.27, 2004.6.4, 2012.6.5, 2013.6.27, 2017.3.24> 제30조(이사의 선임) ① 이사는 주주총회에서 선임한다. <개정 2000.5.27> ② 2인 이상의 이사를 선임하는 경우에도 상법 제382조의 2에서 규정하는 집중투표제를 적용하지 아니한다. [신설 1999.5.29］ 제30조의2(임원 후보의 추천) ① 임원후보추천위원회는 금융회사의 지배구조에 관한 법률, 상법 등 관련 법규에서 정한 자격을 갖춘 자 중에서 임원(대표이사, 사외이사, 감사위원에 한함) 후보를 추천한다. [신설 2012.6.5, 개정2017.3.24］ ② 임원 후보의 추천 및 자격심사에 관한 세부적인 사항은 임원후보추천위원회에서 정한다. [신설 2012.6.5, 개정2017.3.24] 제31조(이사의 임기) ① 이사의 임기는 2년 이내로 하되, 연임할 수 있다. 다만, 사외이사는 회사에서 사외이사로 6년 이상 재직할 수 없고, 회사의 계열회사에서 사외이사로 재직한 기간을 합하여 9년 이상 재직할 수 없다. <개정 2005.3.10, 2010.5.28, 2012.6.5, 2015.3.27, 개정2017.3.24> ② 제1항의 임기가 최종 결산기 종료 후 해당 결산기에 관한 정기주주총회 전에 만료될 경우에는 그 정기주주총회의 종결시까지 그 임기가 연장된다. <개정 1996.5.25, 2000.5.27, 2005.5.27, 2013.6.27, 2014.12.17> 제32조(이사의 보선) ① 이사 중 결원이 생긴 때에는 주주총회에서 이를 선임한다. 그러나 이 정관 제29조에서 정하는 원수를 결하지 아니하고 업무수행상 지장이 없는 경우에는 그러하지 아니한다. <개정 2000.5.27, 2012.6.5> ② 보궐선임된 이사의 임기는 제31조에 따른다. <개정 2000.5.27>
+"""
 dummy_output = '이사는 주주총회에서 선임됩니다. (정관 문서, 제30조)'
 dummy_output2 = '정관의 규정이 법령에 부합하는 것으로 보입니다. 정관 제30조에는 "이사는 주주총회에서 선임한다"는 내용이 명시되어 있으며, 이는 법령인 제382조의 규정과 일치합니다. 따라서, 이사의 선임 방식에 관련하여 정관은 법령에 부합하고 적법한 규정을 가지고 있다고 판단됩니다.'
+
+related_questions = [
+    '이사는 어디에서 선임하는가?',
+    '이사를 선임하기 위한 정족수는 얼마인가?',
+    '이사 선임에 집중투표제를 배제하였는가?'
+]
+related_commercial_law = [
+    '제382조(이사의 선임, 회사와의 관계 및 사외이사) ① 이사는 주주총회에서 선임한다.',
+    '제368조(총회의 결의방법과 의결권의 행사) ①총회의 결의는 이 법 또는 정관에 다른 정함이 있는 경우를 제외하고는 출석한 주주의 의결권의 과반수와 발행주식총수의 4분의 1 이상의 수로써 하여야 한다. <개정 1995. 12. 29.>',
+    '제382조의2(집중투표) ①2인 이상의 이사의 선임을 목적으로 하는 총회의 소집이 있는 때에는 의결권없는 주식을 제외한 발행주식총수의 100분의 3 이상에 해당하는 주식을 가진 주주는 정관에서 달리 정하는 경우를 제외하고는 회사에 대하여 집중투표의 방법으로 이사를 선임할 것을 청구할 수 있다.'
+]
+
+related_questions = [
+    '정기주주총회를 개최하는가?',
+    '임시주주총회를 개최하는가?',
+    '정기주주총회는 언제 소집하나?',
+    '주주총회 의장은 누구인가?',
+    '주주총회 의장이 유고 또는 부재시에 어떻게 하는가?'
+]
+
+related_commercial_law = [
+    '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
+    '제365조(총회의 소집) ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
+    '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다. 제362조(소집의 결정) 총회의 소집은 본법에 다른 규정이 있는 경우 외에는 이사회가 이를 결정한다.',
+    '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.',
+    '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.'
+]
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="example")
@@ -133,11 +209,8 @@ def main(cfg: DictConfig) -> None:
     knowledge_file = cfg.data.knowlegde
 
     # xai_law = XAILaw(knowledge_file)
-
-    prompt = f"""다음 정관 문서를 읽고 질문에 답하세요.
-
-정관 문서: 제 5 장 이사·이사회 제29조(이사의 수) ① 본 회사의 이사는 3인 이상 9인 이하로 한다. ② 이사는 사내이사, 사외이사와 그 밖에 상시적인 업무에 종사하지 아니하는 이사로 구분하고, 사외이사는 3인 이상으로 하되, 이사 총수의 과반수로 한다. <개정 1997.5.31, 1998.5.30, 2000.5.27, 2004.6.4, 2012.6.5, 2013.6.27, 2017.3.24> 제30조(이사의 선임) ① 이사는 주주총회에서 선임한다. <개정 2000.5.27> ② 2인 이상의 이사를 선임하는 경우에도 상법 제382조의 2에서 규정하는 집중투표제를 적용하지 아니한다. [신설 1999.5.29］ 제30조의2(임원 후보의 추천) ① 임원후보추천위원회는 금융회사의 지배구조에 관한 법률, 상법 등 관련 법규에서 정한 자격을 갖춘 자 중에서 임원(대표이사, 사외이사, 감사위원에 한함) 후보를 추천한다. [신설 2012.6.5, 개정2017.3.24］ ② 임원 후보의 추천 및 자격심사에 관한 세부적인 사항은 임원후보추천위원회에서 정한다. [신설 2012.6.5, 개정2017.3.24] 제31조(이사의 임기) ① 이사의 임기는 2년 이내로 하되, 연임할 수 있다. 다만, 사외이사는 회사에서 사외이사로 6년 이상 재직할 수 없고, 회사의 계열회사에서 사외이사로 재직한 기간을 합하여 9년 이상 재직할 수 없다. <개정 2005.3.10, 2010.5.28, 2012.6.5, 2015.3.27, 개정2017.3.24> ② 제1항의 임기가 최종 결산기 종료 후 해당 결산기에 관한 정기주주총회 전에 만료될 경우에는 그 정기주주총회의 종결시까지 그 임기가 연장된다. <개정 1996.5.25, 2000.5.27, 2005.5.27, 2013.6.27, 2014.12.17> 제32조(이사의 보선) ① 이사 중 결원이 생긴 때에는 주주총회에서 이를 선임한다. 그러나 이 정관 제29조에서 정하는 원수를 결하지 아니하고 업무수행상 지장이 없는 경우에는 그러하지 아니한다. <개정 2000.5.27, 2012.6.5> ② 보궐선임된 이사의 임기는 제31조에 따른다. <개정 2000.5.27>
-    """
+    # prompt = dummy_prompt
+    prompt = None
 
     #
     # result = xai_law.request_prompt(prompt)
@@ -163,29 +236,38 @@ def main(cfg: DictConfig) -> None:
     # question: 대표이사는 몇 명인가?, question_type: MC
 
     with gr.Blocks() as demo:
-        def click_button(msg):
-            related_questions = [
-                '이사는 어디에서 선임하는가?',
-                '이사를 선임하기 위한 정족수는 얼마인가?',
-                '이사 선임에 집중투표제를 배제하였는가?'
-            ]
+        prompt_manager = XAILawPrompt()
 
+        def click_button(msg):
             sentences = msg.split('\n')
             print(sentences)
             time.sleep(random.randint(1, 3))
 
             return gr.Radio.update(choices=related_questions)
 
-        def click_button2(value):
-            print('click_button2:', value)
+        def click_button2(question, result):
+            print('click_button2:', question, result)
             text = dummy_output2
-            time.sleep(random.randint(1, 3))
-            return gr.Label.update(text)
+            prompt = prompt_manager.generate_analytic_prompt(question, result['label'])
+            print(prompt)
 
-        def click_radio(value):
-            print('click_radio:', value)
-            time.sleep(random.randint(1, 3))
-            return gr.Label.update('분석 결과를 출력합니다.' + dummy_output)
+            chat_gpt = ChatGPT()
+            result = chat_gpt.request(prompt)
+
+            # time.sleep(random.randint(1, 3))
+            return gr.Label.update(result)
+
+        def click_radio(question, text):
+            print('click_radio:', question)
+            # time.sleep(random.randint(1, 3))
+
+            prompt = prompt_manager.generate_question_prompt(question)
+            print(prompt)
+
+            chat_gpt = ChatGPT()
+            result = chat_gpt.request(prompt)
+
+            return gr.Label.update(result)
 
         def select_radio():
             print('select_radio')
@@ -204,8 +286,9 @@ def main(cfg: DictConfig) -> None:
                 text = f.read()
 
             print('text :', text)
+            prompt_manager.set_article(text)
 
-            time.sleep(random.randint(1, 3))
+            time.sleep(random.uniform(0.5, 1.5))
             return text
 
         gr.Markdown("""# 생성형 AI 기반 정관 검토 서비스""")
@@ -227,10 +310,10 @@ def main(cfg: DictConfig) -> None:
 
         output_label2 = gr.Label(label='Analytic Statement 분석 결과')
 
-        question_radio.input(fn=click_radio, inputs=[question_radio], outputs=[output_label], queue=False)
+        question_radio.input(fn=click_radio, inputs=[question_radio, text1], outputs=[output_label], queue=False)
         question_radio.select(fn=select_radio, outputs=output_label2, queue=False)
 
-        btn2.click(fn=click_button2, inputs=output_label, outputs=output_label2, queue=False)
+        btn2.click(fn=click_button2, inputs=[question_radio, output_label], outputs=output_label2, queue=False)
 
         input_file.upload(fn=upload_input_file, inputs=input_file, outputs=text1)
 
