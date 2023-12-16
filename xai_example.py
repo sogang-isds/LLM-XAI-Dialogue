@@ -243,19 +243,19 @@ def main(cfg: DictConfig) -> None:
             print(sentences)
             time.sleep(random.randint(1, 3))
 
-            return gr.Radio.update(choices=related_questions)
+            return gr.Radio(choices=related_questions)
 
         def click_button2(question, result):
-            print('click_button2:', question, result)
+            print(f"question: {question}, result: {result}")
             text = dummy_output2
-            prompt = prompt_manager.generate_analytic_prompt(question, result['label'])
+            prompt = prompt_manager.generate_analytic_prompt(question, result)
             print(prompt)
 
             chat_gpt = ChatGPT()
             result = chat_gpt.request(prompt)
 
             # time.sleep(random.randint(1, 3))
-            return gr.Label.update(result)
+            return gr.Label(value=result)
 
         def click_radio(question, text):
             print('click_radio:', question)
@@ -267,11 +267,11 @@ def main(cfg: DictConfig) -> None:
             chat_gpt = ChatGPT()
             result = chat_gpt.request(prompt)
 
-            return gr.Label.update(result)
+            return gr.Label(value=result)
 
         def select_radio():
             print('select_radio')
-            return gr.Label.update(value=None)
+            return gr.Label(value=None)
 
         def upload_input_file(file):
             if file is None:
@@ -293,8 +293,9 @@ def main(cfg: DictConfig) -> None:
 
         gr.Markdown("""# 생성형 AI 기반 정관 검토 서비스""")
         gr.Markdown("""## 파일 업로드""")
+        gr.Markdown("""작성한 정관파일을 업로드 하세요.""")
 
-        input_file = gradio.File(label='정관 파일 업로드', type='file')
+        input_file = gradio.File(label='정관 파일 업로드', type='filepath')
 
         gr.Markdown("""## 정관 검토""")
         text1 = gr.Text(prompt, label='정관 내용', max_lines=10)
