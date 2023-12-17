@@ -1,3 +1,6 @@
-# XAI 법률 파트 시연
+# LLM XAI Dialogue
 
-법률 시나리오 시연을 위한 저장소 입니다. 
+LLM을 이용한 XAI 대화 시스템 구현과 관련된 코드입니다.
+
+## Requirements
+
