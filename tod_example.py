@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timedelta
 
-import openai
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
@@ -67,6 +66,8 @@ class PromptAgent:
         self.init_dst_chain()
         self.init_nlg_chain()
 
+        self.today = datetime.today().strftime("%Y-%m-%d %H:%M")
+
     def init_nlu_chain(self):
         schema = {
             "properties": {
@@ -87,8 +88,8 @@ class PromptAgent:
 
         self.nlu_chain = create_extraction_chain(schema, self.llm, prompt=nlu_prompt, verbose=True)
 
-    def run_nlu_chain(self, inp, today):
-        response = self.nlu_chain.run({'user_input': inp, 'today': today})
+    def run_nlu_chain(self, inp):
+        response = self.nlu_chain.run({'user_input': inp, 'today': self.today})
         return response[0]
 
     def init_dst_chain(self):
@@ -101,8 +102,8 @@ class PromptAgent:
         )
         self.dst_chain = LLMChain(llm=self.llm, prompt=dst_prompt, verbose=True)
 
-    def run_dst_chain(self, dialog_state, nlu_result, today):
-        response = self.dst_chain.run({'dialog_state': dialog_state, 'nlu_result': nlu_result, 'today': today})
+    def run_dst_chain(self, dialog_state, nlu_result):
+        response = self.dst_chain.run({'dialog_state': dialog_state, 'nlu_result': nlu_result, 'today': self.today})
         return eval(response)
 
     def init_nlg_chain(self):
@@ -114,8 +115,8 @@ class PromptAgent:
         )
         self.nlg_chain = LLMChain(llm=self.llm, prompt=nlg_prompt, verbose=True)
 
-    def run_nlg_chain(self, dialog_state, today):
-        response = self.nlg_chain.run({'dialog_state': dialog_state, 'today': today})
+    def run_nlg_chain(self, dialog_state):
+        response = self.nlg_chain.run({'dialog_state': dialog_state, 'today': self.today})
         return response
 
 
@@ -157,15 +158,13 @@ User Input: {user_input}
 
     # chain.memory = memory
 
-    today = datetime.today().strftime("%Y-%m-%d %H:%M")
-
     dialog_state = {'event_name': '', 'action': '', 'date': '', 'time': '', 'db': []}
 
     # Input
     # inp = """내일 오후 10시에 산책가기 일정을 등록해줘"""
     inp = """내일 일정을 조회해줘"""
 
-    nlu_result = prompt_agent.run_nlu_chain(inp=inp, today=today)
+    nlu_result = prompt_agent.run_nlu_chain(inp=inp)
     system_action = nlu_result['action']
 
     date_today = datetime.today().strftime("%Y-%m-%d")
@@ -187,10 +186,10 @@ User Input: {user_input}
 
     print(f'dialog_state: {dialog_state}')
 
-    dst_result = prompt_agent.run_dst_chain(dialog_state=dialog_state, nlu_result=nlu_result, today=today)
+    dst_result = prompt_agent.run_dst_chain(dialog_state=dialog_state, nlu_result=nlu_result)
     dialog_state = dst_result
 
-    nlg_result = prompt_agent.run_nlg_chain(dialog_state=dialog_state, today=today)
+    nlg_result = prompt_agent.run_nlg_chain(dialog_state=dialog_state)
     print(nlg_result)
 
     exit()
