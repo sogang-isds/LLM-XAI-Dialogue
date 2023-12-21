@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
-from langchain.memory import ConversationBufferMemory
 from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -13,6 +12,7 @@ from langchain.prompts import (
 )
 from langchain.chains import create_extraction_chain
 
+api_key = os.environ.get("OPENAI_API_KEY")
 
 nlu_prompt_text = """당신은 일정관리 시스템 입니다. 일정관리를 위해 필요한 slot, value를 추출합니다.
 
@@ -194,7 +194,7 @@ class PromptAgent:
 
 
 def main():
-    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=api_key)
     prompt_agent = PromptAgent(llm=llm, verbose=True)
 
     dialog_state = {'event_name': '', 'action': '', 'date': '', 'time': '', 'db': []}
