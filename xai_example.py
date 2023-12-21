@@ -1,18 +1,7 @@
 import logging
-import os
 
 import gradio as gr
-import numpy as np
-import openai
-import pandas as pd
 from langchain.chat_models import ChatOpenAI
-import hydra
-from omegaconf import DictConfig, OmegaConf
-from sentence_transformers import SentenceTransformer, util
-
-chat_llm = ChatOpenAI(model_name="gpt-3.5-turbo")
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 from langchain.schema import (
     AIMessage,
@@ -20,16 +9,11 @@ from langchain.schema import (
     SystemMessage
 )
 
+# api_key = os.getenv("OPENAI_API_KEY")
+key = 'OPENAI_API_KEY'
+api_key = 'sk-' + key + 'bkFJm28ZY54dRNHk3u5edkod'
 
-def get_question(prompt):
-    sentences = prompt.split('\n')
-    question = ""
-    for sentence in sentences:
-        print(sentence)
-        if sentence.startswith("질문:"):
-            question = sentence
-            break
-    return question
+chat_llm = ChatOpenAI(model_name="gpt-3.5-turbo", api_key=api_key)
 
 
 class ChatGPT:
@@ -48,75 +32,6 @@ class ChatGPT:
         logging.info(f'before reset: {len(self.messages)} messages')
         self.messages = []
         logging.info(f'after reset: {len(self.messages)} messages')
-
-
-class XAILaw:
-    def __init__(self, knowlegde_file):
-        self.data = pd.read_csv(knowlegde_file, encoding='utf-8', header=1)
-
-        commercial_laws = self.data['act'].tolist()
-        self.questions = self.data['question'].tolist()
-
-        assert (len(commercial_laws) == len(self.questions))
-        print(self.questions)
-
-        self.model = SentenceTransformer("jhgan/ko-sroberta-multitask")
-
-        self.question_embeddings = self.model.encode(self.questions, convert_to_tensor=True)
-
-    def search_knowledge(self, query, top_k=3):
-        query_embedding = self.model.encode(query, convert_to_tensor=True)
-
-        scores = util.pytorch_cos_sim(query_embedding, self.question_embeddings)
-        cos_scores = scores[0]  # type: torch.Tensor
-
-        assert len(self.questions) == len(cos_scores)
-
-        for sentence, score in zip(self.questions, cos_scores):
-            print(f'{sentence} ({score:.3f})')
-
-        top_results = np.argpartition(-cos_scores, range(top_k))[0:top_k]
-
-        print("\n======================\n")
-        print(f"Top {top_k} most similar sentences in corpus:")
-        for idx in top_results:
-            print(f'{self.questions[idx]} ({cos_scores[idx]:.3f})')
-
-        return self.data.loc[top_results]
-
-    def request_prompt(self, prompt):
-        extracted_question = get_question(prompt)
-        print('extracted_question:', extracted_question)
-
-        query = '이사는 어디에서 선임하나요?'
-        query = extracted_question
-
-        result_frames = self.search_knowledge(query)
-
-        top_result = result_frames.iloc[0]
-        commercial_law = top_result['act']
-        commercial_law_description = top_result['act_description']
-
-        print(commercial_law)
-        print(commercial_law_description)
-
-        chat_gpt = ChatGPT()
-
-        result = chat_gpt.request(prompt)
-        logging.info(f'ChatGPT result: {result}')
-
-        sub_prompt = f'''정관을 검토한 결과, {result}
-법령: {commercial_law_description}
-
-법령에 기반하여 정관의 규정이 적법한지 조언을 생성하세요. 상세하게 작성해주세요.'''
-        print('sub_prompt:', sub_prompt)
-
-        result = chat_gpt.request(sub_prompt)
-        logging.info(f'ChatGPT result: {result}')
-
-        chat_gpt.reset()
-
-        return result
 
 
 class XAILawPrompt:
@@ -141,9 +56,9 @@ class XAILawPrompt:
 """
         return question_prompt
 
-    def generate_analytic_prompt(self, question, result):
-        question_idx = related_questions.index(question)
-        commercial_law = related_commercial_law[question_idx]
+    def generate_analytic_prompt(self, question, result, paragraph_key):
+        question_idx = related_questions[paragraph_key].index(question)
+        commercial_law = related_commercial_law[paragraph_key][question_idx]
 
         prompt = f"""정관의 내용은 아래와 같습니다.
 {self.article}
@@ -164,40 +79,35 @@ class XAILawPrompt:
         return prompt
 
 
-dummy_prompt = f"""다음 정관 문서를 읽고 질문에 답하세요.
+related_commercial_law = {
+    "제4장 주주총회": [
+        '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
+        '제365조(총회의 소집) ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
+        '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다. 제362조(소집의 결정) 총회의 소집은 본법에 다른 규정이 있는 경우 외에는 이사회가 이를 결정한다.',
+        '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.',
+        '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.'
+    ],
+    "제5장 이사·이사회": [
+        '제382조(이사의 선임, 회사와의 관계 및 사외이사) ① 이사는 주주총회에서 선임한다.',
+        '제368조(총회의 결의방법과 의결권의 행사) ①총회의 결의는 이 법 또는 정관에 다른 정함이 있는 경우를 제외하고는 출석한 주주의 의결권의 과반수와 발행주식총수의 4분의 1 이상의 수로써 하여야 한다. <개정 1995. 12. 29.>',
+        '제382조의2(집중투표) ①2인 이상의 이사의 선임을 목적으로 하는 총회의 소집이 있는 때에는 의결권없는 주식을 제외한 발행주식총수의 100분의 3 이상에 해당하는 주식을 가진 주주는 정관에서 달리 정하는 경우를 제외하고는 회사에 대하여 집중투표의 방법으로 이사를 선임할 것을 청구할 수 있다.'
+    ]
+}
 
-정관 문서: 제 5 장 이사·이사회 제29조(이사의 수) ① 본 회사의 이사는 3인 이상 9인 이하로 한다. ② 이사는 사내이사, 사외이사와 그 밖에 상시적인 업무에 종사하지 아니하는 이사로 구분하고, 사외이사는 3인 이상으로 하되, 이사 총수의 과반수로 한다. <개정 1997.5.31, 1998.5.30, 2000.5.27, 2004.6.4, 2012.6.5, 2013.6.27, 2017.3.24> 제30조(이사의 선임) ① 이사는 주주총회에서 선임한다. <개정 2000.5.27> ② 2인 이상의 이사를 선임하는 경우에도 상법 제382조의 2에서 규정하는 집중투표제를 적용하지 아니한다. [신설 1999.5.29］ 제30조의2(임원 후보의 추천) ① 임원후보추천위원회는 금융회사의 지배구조에 관한 법률, 상법 등 관련 법규에서 정한 자격을 갖춘 자 중에서 임원(대표이사, 사외이사, 감사위원에 한함) 후보를 추천한다. [신설 2012.6.5, 개정2017.3.24］ ② 임원 후보의 추천 및 자격심사에 관한 세부적인 사항은 임원후보추천위원회에서 정한다. [신설 2012.6.5, 개정2017.3.24] 제31조(이사의 임기) ① 이사의 임기는 2년 이내로 하되, 연임할 수 있다. 다만, 사외이사는 회사에서 사외이사로 6년 이상 재직할 수 없고, 회사의 계열회사에서 사외이사로 재직한 기간을 합하여 9년 이상 재직할 수 없다. <개정 2005.3.10, 2010.5.28, 2012.6.5, 2015.3.27, 개정2017.3.24> ② 제1항의 임기가 최종 결산기 종료 후 해당 결산기에 관한 정기주주총회 전에 만료될 경우에는 그 정기주주총회의 종결시까지 그 임기가 연장된다. <개정 1996.5.25, 2000.5.27, 2005.5.27, 2013.6.27, 2014.12.17> 제32조(이사의 보선) ① 이사 중 결원이 생긴 때에는 주주총회에서 이를 선임한다. 그러나 이 정관 제29조에서 정하는 원수를 결하지 아니하고 업무수행상 지장이 없는 경우에는 그러하지 아니한다. <개정 2000.5.27, 2012.6.5> ② 보궐선임된 이사의 임기는 제31조에 따른다. <개정 2000.5.27>
-"""
-dummy_output = '이사는 주주총회에서 선임됩니다. (정관 문서, 제30조)'
-dummy_output2 = '정관의 규정이 법령에 부합하는 것으로 보입니다. 정관 제30조에는 "이사는 주주총회에서 선임한다"는 내용이 명시되어 있으며, 이는 법령인 제382조의 규정과 일치합니다. 따라서, 이사의 선임 방식에 관련하여 정관은 법령에 부합하고 적법한 규정을 가지고 있다고 판단됩니다.'
-
-related_questions = [
-    '이사는 어디에서 선임하는가?',
-    '이사를 선임하기 위한 정족수는 얼마인가?',
-    '이사 선임에 집중투표제를 배제하였는가?'
-]
-related_commercial_law = [
-    '제382조(이사의 선임, 회사와의 관계 및 사외이사) ① 이사는 주주총회에서 선임한다.',
-    '제368조(총회의 결의방법과 의결권의 행사) ①총회의 결의는 이 법 또는 정관에 다른 정함이 있는 경우를 제외하고는 출석한 주주의 의결권의 과반수와 발행주식총수의 4분의 1 이상의 수로써 하여야 한다. <개정 1995. 12. 29.>',
-    '제382조의2(집중투표) ①2인 이상의 이사의 선임을 목적으로 하는 총회의 소집이 있는 때에는 의결권없는 주식을 제외한 발행주식총수의 100분의 3 이상에 해당하는 주식을 가진 주주는 정관에서 달리 정하는 경우를 제외하고는 회사에 대하여 집중투표의 방법으로 이사를 선임할 것을 청구할 수 있다.'
-]
-
-related_questions = [
-    '정기주주총회를 개최하는가?',
-    '임시주주총회를 개최하는가?',
-    '정기주주총회는 언제 소집하나?',
-    '주주총회 의장은 누구인가?',
-    '주주총회 의장이 유고 또는 부재시에 어떻게 하는가?'
-]
-
-related_commercial_law = [
-    '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
-    '제365조(총회의 소집) ③임시총회는 필요있는 경우에 수시 이를 소집한다.',
-    '제365조(총회의 소집) ①정기총회는 매년 1회 일정한 시기에 이를 소집하여야 한다. ②연 2회 이상의 결산기를 정한 회사는 매기에 총회를 소집하여야 한다. ③임시총회는 필요있는 경우에 수시 이를 소집한다. 제362조(소집의 결정) 총회의 소집은 본법에 다른 규정이 있는 경우 외에는 이사회가 이를 결정한다.',
-    '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.',
-    '제366조의2(총회의 질서유지) ①총회의 의장은 정관에서 정함이 없는 때에는 총회에서 선임한다. ②총회의 의장은 총회의 질서를 유지하고 의사를 정리한다. ③총회의 의장은 고의로 의사진행을 방해하기 위한 발언ㆍ행동을 하는 등 현저히 질서를 문란하게 하는 자에 대하여 그 발언의 정지 또는 퇴장을 명할 수 있다.'
-]
-
+related_questions = {
+    "제4장 주주총회": [
+        '정기주주총회를 개최하는가?',
+        '임시주주총회를 개최하는가?',
+        '정기주주총회는 언제 소집하나?',
+        '주주총회 의장은 누구인가?',
+        '주주총회 의장이 유고 또는 부재시에 어떻게 하는가?'
+    ],
+    "제5장 이사·이사회": [
+        '이사는 어디에서 선임하는가?',
+        '이사를 선임하기 위한 정족수는 얼마인가?',
+        '이사 선임에 집중투표제를 배제하였는가?'
+    ]
+}
 example_paragraph = {
     "제4장 주주총회": """제 4 장 주주총회 
     
@@ -248,52 +158,23 @@ example_paragraph = {
 }
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="example")
-def main(cfg: DictConfig) -> None:
-    logging.info(f'Hydra config: {OmegaConf.to_yaml(cfg)}')
-
-    knowledge_file = cfg.data.knowlegde
-
-    # xai_law = XAILaw(knowledge_file)
-    # prompt = dummy_prompt
+def main():
     prompt = None
-
-    #
-    # result = xai_law.request_prompt(prompt)
-
-    def request_chatgpt(prompt, chat_history):
-        if prompt.startswith('debug'):
-            response_message = f'echo - {prompt}'
-        else:
-            response_message = xai_law.request_prompt(prompt)
-
-        chat_history.append((prompt, response_message))
-
-        return "", chat_history
-
-    # question: 이사는 어디에서 선임하는가?, question_type: MC
-    # question: 이사를 선임하기 위한 정족수는 얼마인가?, question_type: MC
-    # question: 이사 선임에 집중투표제를 배제하였는가?, question_type: MC
-    # question: (상근) 이사는 몇 명인가?, question_type: MC
-    # question: 사외이사는 몇 명인가?, question_type: QNA
-    # question: 이사의 임기는 몇 년인가?, question_type: MC
-    # question: 이사의 임기를 임기 중 최종 결산기에 대한 정기주종 종료시까지 연장 할 수 있는가?, question_type: MC
-    # question: 대표이사는 어디서 선임하는가?, question_type: MC
-    # question: 대표이사는 몇 명인가?, question_type: MC
 
     with gr.Blocks() as demo:
         prompt_manager = XAILawPrompt()
 
-        def click_button(msg):
+        def click_button(msg, paragraph_key):
+            print(f"msg: {msg}, paragraph_key: {paragraph_key}")
             sentences = msg.split('\n')
             print(sentences)
 
-            return gr.Radio(choices=related_questions)
+            return gr.Radio(choices=related_questions[paragraph_key])
 
-        def click_button2(question, result):
+        def click_button2(question, result, paragraph_key):
             print(f"question: {question}, result: {result}")
-            text = dummy_output2
-            prompt = prompt_manager.generate_analytic_prompt(question, result)
+
+            prompt = prompt_manager.generate_analytic_prompt(question, result, paragraph_key)
             print(prompt)
 
             chat_gpt = ChatGPT()
@@ -347,15 +228,10 @@ def main(cfg: DictConfig) -> None:
         question_radio.input(fn=click_radio, inputs=[question_radio, text1], outputs=[output_label], queue=False)
         question_radio.select(fn=select_radio, outputs=output_label2, queue=False)
 
-        btn2.click(fn=click_button2, inputs=[question_radio, output_label], outputs=output_label2, queue=False)
+        btn2.click(fn=click_button2, inputs=[question_radio, output_label, dropdown], outputs=output_label2,
+                   queue=False)
 
-        btn1.click(fn=click_button, inputs=text1, outputs=question_radio, queue=False)
-
-        msg = gr.Textbox(label="입력")  # '입력'이라는 레이블을 가진 텍스트박스를 생성합니다.
-        clear = gr.Button("초기화")  # '초기화'라는 레이블을 가진 버튼을 생성합니다.
-
-        # msg.submit(request_chatgpt, [msg, chatbot], [msg, chatbot])  # 텍스트박스에 메시지를 입력하고 제출하면 respond 함수가 호출되도록 합니다.
-        # clear.click(lambda: None, None, chatbot, queue=False)  # '초기화' 버튼을 클릭하면 채팅 기록을 초기화합니다.
+        btn1.click(fn=click_button, inputs=[text1, dropdown], outputs=question_radio, queue=False)
 
     demo.launch()
 
